@@ -22,7 +22,9 @@ A Python-based AWS automation script that creates and configures an EC2 instance
 JB_AWS_Project/
 │── SSH_Key_and_EC2.py          # Main script
 │── README.md
-└── requirements.txt            # Python dependencies
+│── requirements.txt            # Python dependencies
+└── images/
+    └── diagram.png
 
 ````
 
