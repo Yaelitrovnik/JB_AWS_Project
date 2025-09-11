@@ -58,8 +58,8 @@ pip install -r requirements.txt
 1. **Clone the repository:**
 
 ```bash
-git clone <your-repo-url>
-cd EC2_Builder
+git clone https://github.com/Yaelitrovnik/JB_AWS_Project
+cd SSH_Key_and_EC2
 ```
 
 2. **Create a virtual environment:**
