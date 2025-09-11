@@ -19,7 +19,7 @@ A Python-based AWS automation script that creates and configures an EC2 instance
 
 ```
 
-EC2\_Builder/
+JB_AWS_Project/
 │── SSH\_Key\_and\_EC2.py          # Main script
 │── README.md
 └── requirements.txt            # Python dependencies
@@ -59,7 +59,7 @@ pip install -r requirements.txt
 
 ```bash
 git clone https://github.com/Yaelitrovnik/JB_AWS_Project
-cd SSH_Key_and_EC2
+cd JB_AWS_Project
 ```
 
 2. **Create a virtual environment:**
