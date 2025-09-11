@@ -28,47 +28,47 @@ def generate_ssh_key():
 
 def save_private_key_locally(private_key_pem, filename="builder_key.pem"):
     """Save the private key locally with 0600 permissions."""
-    print(f"💾 Saving private key to {filename}...")
+    print(f"Saving private key to {filename}...")
     full_path = os.path.join(os.path.dirname(os.path.abspath(_file_)), filename)
     try:
         with open(full_path, "wb") as f:
             f.write(private_key_pem)
         os.chmod(full_path, 0o600)
-        print("✅ Private key saved with 0600 permissions")
+        print("Private key saved with 0600 permissions")
         return {'filename': full_path, 'content': private_key_pem}
     except Exception as e:
-        print(f"❌ Error saving private key: {e}")
+        print(f"Error saving private key: {e}")
         sys.exit(1)
 
 def create_aws_key_pair(key_name, public_key, region="us-east-2"):
     """Create an AWS key pair using the public key."""
-    print(f"☁  Creating AWS key pair '{key_name}' in {region}...")
+    print(f"Creating AWS key pair '{key_name}' in {region}...")
     try:
         ec2 = boto3.client("ec2", region_name=region)
         try:
             ec2.describe_key_pairs(KeyNames=[key_name])
-            print(f"⚠  Key pair '{key_name}' already exists. Deleting it...")
+            print(f"Key pair '{key_name}' already exists. Deleting it...")
             ec2.delete_key_pair(KeyName=key_name)
         except ClientError as e:
             if "InvalidKeyPair.NotFound" not in str(e):
                 raise
         response = ec2.import_key_pair(KeyName=key_name, PublicKeyMaterial=public_key)
-        print(f"✅ AWS key pair '{key_name}' created successfully")
+        print(f"AWS key pair '{key_name}' created successfully")
         return {
             'key_name': key_name,
             'key_fingerprint': response.get('KeyFingerprint'),
             'key_pair_id': response.get('KeyPairId')
         }
     except NoCredentialsError:
-        print("❌ AWS credentials not configured.")
+        print("AWS credentials not configured.")
         sys.exit(1)
     except ClientError as e:
-        print(f"❌ AWS Error: {e}")
+        print(f"AWS Error: {e}")
         sys.exit(1)
 
 def get_public_subnet_from_vpc(vpc_id, region="us-east-2"):
     """Get a public subnet from the specified VPC."""
-    print(f"🔍 Finding public subnet in VPC {vpc_id}...")
+    print(f"Finding public subnet in VPC {vpc_id}...")
     ec2 = boto3.client("ec2", region_name=region)
     response = ec2.describe_subnets(
         Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}, {'Name': 'state', 'Values': ['available']}]
@@ -78,14 +78,14 @@ def get_public_subnet_from_vpc(vpc_id, region="us-east-2"):
         raise Exception(f"No subnets found in VPC {vpc_id}")
     for subnet in subnets:
         if subnet.get('MapPublicIpOnLaunch', False):
-            print(f"✅ Found public subnet: {subnet['SubnetId']}")
+            print(f"Found public subnet: {subnet['SubnetId']}")
             return subnet['SubnetId']
-    print(f"⚠  No public subnet flag found, using first available: {subnets[0]['SubnetId']}")
+    print(f"No public subnet flag found, using first available: {subnets[0]['SubnetId']}")
     return subnets[0]['SubnetId']
 
 def create_security_group(vpc_id, region="us-east-2"):
     """Create a new security group or reuse existing one."""
-    print("🛡  Creating or using existing security group...")
+    print("Creating or using existing security group...")
     ec2 = boto3.client("ec2", region_name=region)
     sg_name = "builder-yael-sg"
 
@@ -99,7 +99,7 @@ def create_security_group(vpc_id, region="us-east-2"):
         )
         if sg_response['SecurityGroups']:
             sg_id = sg_response['SecurityGroups'][0]['GroupId']
-            print(f"✅ Using existing security group: {sg_id}")
+            print(f"Using existing security group: {sg_id}")
             return sg_id
 
         # Otherwise create new SG
@@ -119,30 +119,30 @@ def create_security_group(vpc_id, region="us-east-2"):
             ]
         )
 
-        print(f"✅ Security group created: {sg_id}")
+        print(f"Security group created: {sg_id}")
         return sg_id
 
     except ClientError as e:
-        print(f"❌ Error creating security group: {e}")
+        print(f"Error creating security group: {e}")
         sys.exit(1)
 
 
 def create_ec2_instance(key_name, region="us-east-2"):
     """Create an EC2 instance with SSH key and security group."""
-    print("🚀 Creating EC2 instance...")
+    print("Creating EC2 instance...")
     ec2 = boto3.client("ec2", region_name=region)
     vpc_id = "vpc-0c678d4904a68bd91"
     subnet_id = get_public_subnet_from_vpc(vpc_id, region)
     sg_id = create_security_group(vpc_id, region)
 
-    print("🔍 Getting latest Amazon Linux 2 AMI...")
+    print("Getting latest Amazon Linux 2 AMI...")
     response = ec2.describe_images(
         Owners=['amazon'],
         Filters=[{'Name': 'name', 'Values': ['amzn2-ami-hvm-*-x86_64-gp2']}, {'Name': 'state', 'Values': ['available']}]
     )
     images = sorted(response['Images'], key=lambda x: x['CreationDate'], reverse=True)
     latest_ami = images[0]['ImageId']
-    print(f"✅ Using AMI: {latest_ami}")
+    print(f"Using AMI: {latest_ami}")
 
     response = ec2.run_instances(
         ImageId=latest_ami,
@@ -163,7 +163,7 @@ def create_ec2_instance(key_name, region="us-east-2"):
     )
 
     instance_id = response['Instances'][0]['InstanceId']
-    print(f"⏳ Instance launched: {instance_id}")
+    print(f"Instance launched: {instance_id}")
     waiter = ec2.get_waiter('instance_running')
     waiter.wait(InstanceIds=[instance_id])
     instance_info = ec2.describe_instances(InstanceIds=[instance_id])
@@ -181,19 +181,19 @@ def create_ec2_instance(key_name, region="us-east-2"):
     }
 
 def main():
-    print("🎯 Starting SSH Key Generation and EC2 Instance Creation")
+    print("Starting SSH Key Generation and EC2 Instance Creation")
     print("="*65)
-    print("\n1️⃣  SSH Key Generation")
+    print("\n1SSH Key Generation")
     ssh_key = generate_ssh_key()
-    print("\n2️⃣  Save Private Key Locally")
+    print("\nSave Private Key Locally")
     private_key_file = save_private_key_locally(ssh_key['private_key_pem'], "builder_key.pem")
-    print("\n3️⃣  Create AWS Key Pair")
+    print("\nCreate AWS Key Pair")
     aws_key_pair = create_aws_key_pair("builder-key", ssh_key['public_key_openssh'], "us-east-2")
-    print("\n4️⃣  Create EC2 Instance")
+    print("\nCreate EC2 Instance")
     ec2_instance = create_ec2_instance("builder-key", "us-east-2")
     
     print("\n" + "="*65)
-    print("🎉 TERRAFORM-STYLE OUTPUTS")
+    print("TERRAFORM-STYLE OUTPUTS")
     print("="*65)
     print(f"ssh_private_key_path = \"{private_key_file['filename']}\" (sensitive)")
     print(f"ssh_key_name = \"{aws_key_pair['key_name']}\"")
@@ -205,13 +205,13 @@ def main():
     print(f"vpc_id = \"{ec2_instance['vpc_id']}\"")
     print(f"subnet_id = \"{ec2_instance['subnet_id']}\"")
     print(f"region = \"{ec2_instance['region']}\"")
-    print(f"\n📋 Additional Information:")
+    print(f"\nAdditional Information:")
     print(f"Key Fingerprint: {aws_key_pair['key_fingerprint']}")
     print(f"Key Pair ID: {aws_key_pair['key_pair_id']}")
     print(f"AMI ID: {ec2_instance['ami_id']} (Amazon Linux 2)")
     print(f"Security Group: {ec2_instance['security_group_id']}")
-    print(f"\n🔐 SSH Command: ssh -i \"{private_key_file['filename']}\" ec2-user@{ec2_instance['public_ip']}")
-    print(f"\n✅ SUCCESS! Instance 'builder-yael' created in {ec2_instance['region']}")
+    print(f"\nSSH Command: ssh -i \"{private_key_file['filename']}\" ec2-user@{ec2_instance['public_ip']}")
+    print(f"\nSUCCESS! Instance 'builder-yael' created in {ec2_instance['region']}")
 
 if _name_ == "_main_":
     main()
