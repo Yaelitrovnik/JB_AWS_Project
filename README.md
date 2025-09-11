@@ -1,6 +1,3 @@
-Got it! I can rewrite your **EC2 Builder Script README** in the **same professional, GitHub-style format** as your VM simulator example. Here's a complete version:
-
-```markdown
 # 🚀 EC2 Builder Script
 
 A Python-based AWS automation script that creates and configures an EC2 instance with SSH access, a security group, and the latest Amazon Linux 2 AMI.
