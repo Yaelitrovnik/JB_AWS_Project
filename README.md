@@ -23,7 +23,8 @@ JB_AWS_Project/
 │── README.md
 │── requirements.txt            # Python dependencies
 └── images/
-    └── diagram.png
+    │── instance_info.jpg
+    └── instance.jpg
 ```
 
 ---
