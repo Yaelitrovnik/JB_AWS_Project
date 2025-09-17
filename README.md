@@ -18,15 +18,13 @@ A Python-based AWS automation script that creates and configures an EC2 instance
 ## Project Structure
 
 ```
-
 JB_AWS_Project/
-│── SSH_Key_and_EC2.py          # Main script
+│── setup_builder_instance.py   # Main script
 │── README.md
 │── requirements.txt            # Python dependencies
 └── images/
     └── diagram.png
-
-````
+```
 
 ---
 
@@ -34,7 +32,7 @@ JB_AWS_Project/
 
 ### Python Dependencies
 
-- Python 3.13+
+- Python 3.8+
 - boto3
 - cryptography
 
@@ -42,13 +40,12 @@ Install with:
 
 ```bash
 pip install -r requirements.txt
-````
+```
 
 ### AWS Requirements
 
 * AWS account with configured credentials (`~/.aws/credentials` or environment variables)
 * IAM permissions for EC2, VPC, and key pair operations:
-
   * `RunInstances`, `DescribeInstances`
   * `CreateSecurityGroup`, `AuthorizeSecurityGroupIngress`
   * `ImportKeyPair`
@@ -86,12 +83,30 @@ pip install -r requirements.txt
 
 ## Configuration
 
-Edit the script variables to match your environment:
+### Required Configuration
+
+**IMPORTANT**: Before running the script, you must update your public IP address:
 
 ```python
-vpc_id = "vpc-xxxxxxxx"       # Your VPC ID
-region = "us-east-2"          # AWS region
-key_name = "builder-key"      # Name of the SSH key pair
+student_ip = "YOUR_PUBLIC_IP/32"  # Replace with your actual public IP
+```
+
+**Find your public IP:**
+```bash
+# Command line
+curl ifconfig.me
+
+# Or visit: https://whatismyipaddress.com/
+```
+
+### Other Script Variables
+
+Edit these variables in the script to match your environment:
+
+```python
+vpc_id = "vpc-0c678d4904a68bd91"  # Your VPC ID (default provided)
+region = "us-east-2"              # AWS region
+key_name = "builder-key"          # Name of the SSH key pair
 ```
 
 > By default, the script selects the first public subnet in the VPC and creates a security group if it doesn't exist.
@@ -103,7 +118,7 @@ key_name = "builder-key"      # Name of the SSH key pair
 Run the script:
 
 ```bash
-python3 SSH_Key_and_EC2.py
+python3 setup_builder_instance.py
 ```
 
 ### Example Terraform-style output:
@@ -127,8 +142,9 @@ Security Group: sg-0abc1234def56789
 
 ## Security Notes
 
-* Overwrites existing AWS key pairs with the same name.
-* Security group allows SSH from any IP (`0.0.0.0/0`) – adjust for production use.
+* **IP Restriction**: Security group restricts SSH and port 5001 access to your specific IP address only – ensure you update the `student_ip` variable with your actual public IP.
+* **Key Management**: Overwrites existing AWS key pairs with the same name for consistency.
+* **Private Key**: SSH private key is saved locally with secure 0600 permissions.
 
 ---
 
@@ -140,6 +156,7 @@ Security Group: sg-0abc1234def56789
 | Subnet or SG errors       | Ensure VPC ID exists and has available subnets               |
 | Permission errors         | Check IAM user permissions                                   |
 | SSH connection fails      | Verify security group rules and correct key file permissions |
+| IP access denied          | Update `student_ip` with your current public IP address      |
 
 ---
 
