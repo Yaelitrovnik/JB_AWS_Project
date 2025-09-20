@@ -6,7 +6,7 @@ from functools import lru_cache
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 @lru_cache(maxsize=1)
 def get_cached_aws_clients():
@@ -180,7 +180,7 @@ if _name_ == "_main_":
     logger.info("Starting AWS Resources Dashboard on port 5001...")
     app.run(host="0.0.0.0", port=5001, debug=False)
 """
-    app_file_path = os.path.join(os.path.dirname(os.path.abspath(_file_)), "app.py")
+    app_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.py")
     with open(app_file_path, "w", encoding='utf-8') as f:
         f.write(app_content)
     logger.info(f"Created Flask app file: {app_file_path}")

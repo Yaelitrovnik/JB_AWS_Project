@@ -29,7 +29,7 @@ def generate_ssh_key():
 def save_private_key_locally(private_key_pem, filename="builder_key.pem"):
     """Save the private key locally with 0600 permissions."""
     print(f"Saving private key to {filename}...")
-    full_path = os.path.join(os.path.dirname(os.path.abspath(_file_)), filename)
+    full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
     try:
         with open(full_path, "wb") as f:
             f.write(private_key_pem)
@@ -213,5 +213,5 @@ def main():
     print(f"\nSSH Command: ssh -i \"{private_key_file['filename']}\" ec2-user@{ec2_instance['public_ip']}")
     print(f"\nSUCCESS! Instance 'builder-yael' created in {ec2_instance['region']}")
 
-if _name_ == "_main_":
+if __name__ == "_main_":
     main()
