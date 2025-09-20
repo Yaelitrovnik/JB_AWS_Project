@@ -1,3 +1,4 @@
+import os
 import sys
 import logging
 from config_manager import load_config
@@ -8,7 +9,7 @@ from cleanup import cleanup_resources
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 def main(cleanup=False):
     """Main function to orchestrate AWS infrastructure and Flask app deployment."""
@@ -96,7 +97,7 @@ def main(cleanup=False):
         logger.error("Check your AWS credentials, permissions, and VPC configuration")
         sys.exit(1)
 
-if _name_ == "_main_":
+if __name__ == "_main_":
     import argparse
     parser = argparse.ArgumentParser(description="AWS Infrastructure and Flask App Deployment")
     parser.add_argument('--cleanup', action='store_true', help='Clean up created resources')

@@ -3,7 +3,7 @@ import logging
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 def cleanup_resources(instance_id=None, key_name=None, sg_id=None, iam_role=None, region='us-east-2'):
     """Clean up created resources."""

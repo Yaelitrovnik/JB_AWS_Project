@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives import serialization
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 def detect_platform():
     """Detect platform and SSH capability."""
@@ -45,7 +45,7 @@ def generate_ssh_key():
 def save_private_key_locally(private_key_pem, filename="builder_key.pem"):
     """Save SSH private key."""
     logger.info(f"Saving private key to {filename}...")
-    full_path = os.path.join(os.path.dirname(os.path.abspath(_file_)), filename)
+    full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
     try:
         with open(full_path, "wb") as f:
             f.write(private_key_pem)

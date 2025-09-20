@@ -8,7 +8,7 @@ from functools import wraps
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 def retry_on_failure(max_retries=3, delay=5):
     """Retry decorator with exponential backoff."""
