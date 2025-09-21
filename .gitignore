@@ -1,0 +1,47 @@
+# =========================
+# Python cache & compiled files
+# =========================
+_pycache_/
+*.py[cod]
+*.pyo
+*.pyd
+
+# =========================
+# Virtual environment
+# =========================
+venv/
+ENV/
+env/
+.venv/
+
+# =========================
+# SSH Key (sensitive)
+# =========================
+builder_key.pem
+
+# =========================
+# Flask app temporary files
+# =========================
+*.log
+*.tmp
+*.bak
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# =========================
+# Images temporary files (optional)
+# =========================
+images/*.tmp
+images/*.bak
