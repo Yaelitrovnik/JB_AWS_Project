@@ -20,13 +20,14 @@ It also deploys a Flask web dashboard accessible via a custom port (5001).
 
 ```
 
-JB\_AWS\_Project/
+JB_AWS_Project/
 │── universal_deployment.py   # Main Python script
 │── README.md
 │── requirements.txt          # Python dependencies
+│── .gitignore
 └── images/
-│── instance_info.jpg
-└── instance.jpg
+  │── instance_info.jpg
+  └── instance.jpg
 
 ````
 
