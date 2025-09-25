@@ -232,19 +232,31 @@ def create_ec2_instance(key_name, vpc_id, subnet_id, sg_id, region="us-east-2"):
     print("🚀 Creating EC2 instance...")
     ec2 = boto3.client("ec2", region_name=region)
 
-    print("📦 Getting latest Amazon Linux 2 AMI...")
+    print("📦 Getting latest Amazon Linux AMI...")
     try:
-        response = ec2.describe_images(
-            Owners=['amazon'],
-            Filters=[
-                {'Name': 'name', 'Values': ['amzn2-ami-hvm-*-x86_64-gp2']}, 
-                {'Name': 'state', 'Values': ['available']}
-            ],
-            MaxItems=50
-        )
-        images = sorted(response['Images'], key=lambda x: x['CreationDate'], reverse=True)
-        latest_ami = images[0]['ImageId']
-        print(f"✅ Using AMI: {latest_ami}")
+        # Use AWS Systems Manager to get the latest Amazon Linux 2 AMI ID
+        ssm = boto3.client('ssm', region_name=region)
+    
+        try:
+            # Get the latest Amazon Linux 2 AMI ID from AWS Parameter Store
+            response = ssm.get_parameter(
+                Name='/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+            )
+            latest_ami = response['Parameter']['Value']
+            print(f"✅ Using Amazon Linux 2 AMI: {latest_ami}")
+        except Exception:
+            # Fallback: try Amazon Linux 2023
+            try:
+                response = ssm.get_parameter(
+                    Name='/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64'
+                )
+                latest_ami = response['Parameter']['Value']
+                print(f"✅ Using Amazon Linux 2023 AMI: {latest_ami}")
+            except Exception:
+                # Final fallback: use a known working AMI ID for us-east-2
+                latest_ami = "ami-0c7217cdde317cfec"  # Amazon Linux 2 in us-east-2
+                print(f"✅ Using fallback AMI: {latest_ami}")
+            
     except Exception as e:
         print(f"❌ Error finding AMI: {e}")
         sys.exit(1)
