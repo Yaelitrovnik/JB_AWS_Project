@@ -1,18 +1,19 @@
+
 # 🚀 EC2 Builder Script
 
-A Python-based AWS automation script that creates and configures an EC2 instance with SSH access, a security group, and the latest Amazon Linux 2 AMI.  
-It also deploys a Flask web dashboard accessible via a custom port (5001).
+A Python-based AWS automation script that creates and configures an EC2 instance with SSH access, a security group, and the latest Ubuntu 22.04 LTS AMI.  
+It also deploys a Flask web dashboard accessible via a custom port (5001) that shows AWS resources: EC2 instances, VPCs, Load Balancers, and AMIs.
 
 ---
 
 ## Features
 
-- 🖥️ **EC2 Instance Creation**: Launch EC2 instances with a predefined instance type (`t3.medium`) and latest Amazon Linux 2 AMI.  
+- 🖥️ **EC2 Instance Creation**: Launch EC2 instances with a predefined instance type (`t3.medium`) and Ubuntu 22.04 LTS AMI.  
 - 🔑 **SSH Key Management**: Automatically generates a 4096-bit RSA SSH key pair and imports it to AWS.  
 - 🛡️ **Security Group Setup**: Creates or reuses a security group with inbound rules for SSH (port 22) and web access (port 5001).  
-- 🌐 **Subnet Selection**: Automatically selects a public subnet in the VPC.  
-- 📋 **Tagging & Metadata**: Names the instance (`builder-yael`) and enforces IMDSv2 for enhanced security.  
-- 📊 **Web Dashboard**: Flask app shows EC2, VPC, AMI, and Load Balancer info in a browser.  
+- 🌐 **Subnet & IGW Management**: Automatically selects a public subnet in the VPC and attaches an Internet Gateway if missing.  
+- 📋 **Tagging & Metadata**: Names the instance (`builder-yael`).  
+- 📊 **Web Dashboard**: Flask app shows EC2 instances, VPCs, Load Balancers, and AMIs in a browser.
 
 ---
 
@@ -21,13 +22,12 @@ It also deploys a Flask web dashboard accessible via a custom port (5001).
 ```
 
 JB_AWS_Project/
-│── universal_deployment.py   # Main Python script
+│── universal_deployment.py   # Main Python deployment script
 │── README.md
 │── requirements.txt          # Python dependencies
 │── .gitignore
 └── images/
-  │── instance_info.jpg
-  └── instance.jpg
+└── instance_info.jpg
 
 ````
 
@@ -38,9 +38,9 @@ JB_AWS_Project/
 ### Python Dependencies
 
 - Python >= 3.9
-- boto3==1.40.28
-- cryptography==39.0.1
-- flask==3.1.2
+- boto3
+- cryptography
+- flask
 
 Install dependencies with:
 
@@ -48,16 +48,18 @@ Install dependencies with:
 pip install -r requirements.txt
 ````
 
-> **Note:** `botocore` is automatically installed with `boto3`, no need to pin separately.
+> **Note:** `botocore` is installed automatically with `boto3`.
 
 ### AWS Requirements
 
 * AWS account with configured credentials (`~/.aws/credentials` or environment variables)
-* IAM permissions for EC2, VPC, and key pair operations:
+* IAM permissions for EC2, VPC, Security Groups, Key Pair, and ELB operations:
 
   * `RunInstances`, `DescribeInstances`
   * `CreateSecurityGroup`, `AuthorizeSecurityGroupIngress`
   * `ImportKeyPair`
+  * `DescribeVpcs`, `DescribeSubnets`
+  * `DescribeImages`, `DescribeLoadBalancers`
 
 ---
 
@@ -94,19 +96,17 @@ pip install -r requirements.txt
 
 ### Public IP Restriction
 
-Before running the script, ensure your public IP is set for the security group:
+By default, the security group allows access from anywhere (`0.0.0.0/0`) for testing.
+For production, replace with your IP in the `get_user_ip()` function:
 
 ```python
-student_ip = "YOUR_PUBLIC_IP/32"  # Replace with your actual public IP
+student_ip = "YOUR_PUBLIC_IP/32"
 ```
 
 Find your public IP:
 
 ```bash
-# Command line
 curl ifconfig.me
-
-# Or visit: https://whatismyipaddress.com/
 ```
 
 ### Optional Script Variables
@@ -114,12 +114,12 @@ curl ifconfig.me
 Edit these in `universal_deployment.py` if needed:
 
 ```python
-vpc_id = "vpc-0c678d4904a68bd91"  # Your VPC ID (default provided)
-region = "us-east-2"              # AWS region
-key_name = "builder-key"          # Name of the SSH key pair
+vpc_id = "vpc-xxxxxxxxxxxx"      # Optional VPC ID
+region = "us-east-2"             # AWS region
+key_name = "builder-key"         # SSH key pair name
 ```
 
-> By default, the script selects the first public subnet in the VPC and creates a security group if it doesn’t exist.
+> By default, the script selects the first public subnet in the VPC, creates a security group if it doesn’t exist, and attaches an Internet Gateway if the subnet cannot reach the internet.
 
 ---
 
@@ -134,41 +134,94 @@ python universal_deployment.py
 ### Example Output
 
 ```
-ssh_private_key_path = "builder_key.pem" (sensitive)
-ssh_key_name = "builder-key"
-instance_id = "i-0abc1234def56789"
-instance_name = "builder-yael"
-instance_type = "t3.medium"
-instance_public_ip = "3.123.45.67"
-instance_public_dns = "ec2-3-123-45-67.compute-1.amazonaws.com"
-vpc_id = "vpc-0c678d4904a68bd91"
-subnet_id = "subnet-0abc1234def56789"
-region = "us-east-2"
-Security Group: sg-0abc1234def56789
-🔐 SSH Command: ssh -i "builder_key.pem" ec2-user@3.123.45.67
-Web Dashboard: http://3.123.45.67:5001
-Health Check: http://3.123.45.67:5001/health
+🎉 DEPLOYMENT COMPLETED!
+🏷️ Instance Name: builder-yael
+🆔 Instance ID: i-0abc1234def56789
+🌐 Public IP: 3.123.45.67
+📍 Region: us-east-2
+🐧 OS: Ubuntu 22.04 LTS
+
+🔗 Access Information:
+   Web Dashboard: http://3.123.45.67:5001
+   Health Check: http://3.123.45.67:5001/health
+   SSH Command: ssh -i "builder_key.pem" ubuntu@3.123.45.67
+
+📁 Files Created:
+   • SSH Key: builder_key.pem
+```
+
+---
+
+## Web Dashboard
+
+Once the EC2 instance is running, visit:
+
+```
+http://<Public-IP>:5001
+```
+
+It shows:
+
+* Running EC2 instances (ID, state, type, public IP)
+* VPCs (ID, CIDR)
+* Load Balancers (name, DNS)
+* Available AMIs (ID, name)
+
+Health endpoint:
+
+```
+http://<Public-IP>:5001/health
+```
+
+---
+
+## SSH Access
+
+Connect to your instance:
+
+```bash
+ssh -i "builder_key.pem" ubuntu@<Public-IP>
+```
+
+Disconnect:
+
+```bash
+exit
 ```
 
 ---
 
 ## Security Notes
 
-* **IP Restriction**: Security group restricts SSH and port 5001 access to your specific IP only.
-* **Key Management**: Overwrites existing AWS key pairs with the same name for consistency.
+* **IP Restriction**: Adjust your public IP for production use.
+* **Key Management**: Existing AWS key pairs with the same name are overwritten.
 * **Private Key**: Saved locally with secure 0600 permissions.
 
 ---
 
 ## Troubleshooting
 
-| Issue                     | Solution                                                     |
-| ------------------------- | ------------------------------------------------------------ |
-| AWS credentials not found | Configure AWS CLI or environment variables                   |
-| Subnet or SG errors       | Ensure VPC ID exists and has available subnets               |
-| Permission errors         | Check IAM user permissions                                   |
-| SSH connection fails      | Verify security group rules and correct key file permissions |
-| Web dashboard not loading | Wait 2-3 minutes after deployment                            |
-| IP access denied          | Update `student_ip` with your current public IP              |
+| Issue                     | Solution                                             |
+| ------------------------- | ---------------------------------------------------- |
+| AWS credentials not found | Run `aws configure` or set environment variables     |
+| Subnet or SG errors       | Ensure VPC exists and has available subnets          |
+| Permission errors         | Check IAM user permissions                           |
+| SSH connection fails      | Verify security group rules and key file permissions |
+| Web dashboard not loading | Wait 2-3 minutes after deployment                    |
+| IP access denied          | Update `student_ip` with your current public IP      |
+
+---
+
+## Cleanup
+
+To remove all resources created by the script:
+
+1. Terminate the EC2 instance.
+2. Delete the security group `builder-yael-sg`.
+3. Delete the key pair `builder-key` in AWS.
+4. Optionally, remove `builder_key.pem` locally.
+
+```
+
 
 
