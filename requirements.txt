@@ -1,14 +1,5 @@
-# requirements.txt
-
-# Python version requirement
-python>=3.9
-
-# AWS SDK
-boto3==1.40.28
-# botocore comes with boto3 automatically, no need to pin separately
-
-# Security & encryption
-cryptography==39.0.1
-
-# Web framework
-flask==3.1.2
+boto3==1.28.49
+botocore==1.31.49
+cryptography==41.0.3
+Flask==3.2.2
+Jinja2==3.1.2
