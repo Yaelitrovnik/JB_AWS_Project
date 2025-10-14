@@ -27,7 +27,7 @@ JB_AWS_Project/
 │── requirements.txt          # Python dependencies
 │── .gitignore
 └── images/
-└── instance_info.jpg
+   └── AWS_Reasources_Dashboard.jpg
 
 ````
 
