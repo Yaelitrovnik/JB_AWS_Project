@@ -227,38 +227,101 @@ cat > /home/ubuntu/webapp/app.py << 'FLASKAPP'
 import os
 import boto3
 from flask import Flask, render_template_string
+import traceback
 
 app = Flask(__name__)
 
-# Initialize Boto3 client using instance role (no keys required if instance has IAM role)
-ec2_client = boto3.client("ec2", region_name="us-east-2")
-elb_client = boto3.client("elbv2", region_name="us-east-2")
+def get_self_instance_info():
+    try:
+        base_url = "http://169.254.169.254/latest/meta-data"
+        instance_id = requests.get(f"{base_url}/instance-id", timeout=2).text
+        public_ip = requests.get(f"{base_url}/public-ipv4", timeout=2).text
+        instance_type = requests.get(f"{base_url}/instance-type", timeout=2).text
+        return [{
+            "ID": instance_id,
+            "State": "running",
+            "Type": instance_type,
+            "Public IP": public_ip
+        }]
+    except Exception as e:
+        print(f"Error fetching instance metadata: {e}")
+        return []
+
+try:
+    ec2_client = boto3.client("ec2", region_name="us-east-2")
+except Exception as e:
+    print(f"Error creating EC2 client: {e}")
+    ec2_client = None
+
+try:
+    elb_client = boto3.client("elbv2", region_name="us-east-2")
+except Exception as e:
+    print(f"Error creating ELB client: {e}")
+    elb_client = None
 
 @app.route("/")
 def home():
-    # Fetch EC2 instances
-    instances = ec2_client.describe_instances()
     instance_data = []
-    for reservation in instances["Reservations"]:
-        for instance in reservation["Instances"]:
-            instance_data.append({
-                "ID": instance["InstanceId"],
-                "State": instance["State"]["Name"],
-                "Type": instance["InstanceType"],
-                "Public IP": instance.get("PublicIpAddress", "N/A")
-            })
+    if ec2_client:
+        try:
+            instances = ec2_client.describe_instances()
+            for reservation in instances.get("Reservations", []):
+                for instance in reservation.get("Instances", []):
+                    instance_data.append({
+                        "ID": instance.get("InstanceId", "N/A"),
+                        "State": instance.get("State", {}).get("Name", "N/A"),
+                        "Type": instance.get("InstanceType", "N/A"),
+                        "Public IP": instance.get("PublicIpAddress", "N/A")
+                    })
+        except Exception as e:
+            print(f"Error fetching EC2 instances: {e}")
+            # fallback to self metadata
+            instance_data = get_self_instance_info()
+    else:
+        instance_data = get_self_instance_info()
 
-    # Fetch VPCs
-    vpcs = ec2_client.describe_vpcs()
-    vpc_data = [{"VPC ID": vpc["VpcId"], "CIDR": vpc["CidrBlock"]} for vpc in vpcs["Vpcs"]]
 
-    # Fetch Load Balancers
-    lbs = elb_client.describe_load_balancers()
-    lb_data = [{"LB Name": lb["LoadBalancerName"], "DNS Name": lb["DNSName"]} for lb in lbs["LoadBalancers"]]
+    # VPCs
+    vpc_data = []
+    if ec2_client:
+        try:
+            vpcs = ec2_client.describe_vpcs()
+            for vpc in vpcs.get("Vpcs", []):
+                vpc_data.append({
+                    "VPC ID": vpc.get("VpcId", "N/A"),
+                    "CIDR": vpc.get("CidrBlock", "N/A")
+                })
+        except Exception as e:
+            print(f"Error fetching VPCs: {e}")
+            traceback.print_exc()
 
-    # Fetch AMIs (owned by this account)
-    amis = ec2_client.describe_images(Owners=["self"])
-    ami_data = [{"AMI ID": ami["ImageId"], "Name": ami.get("Name", "N/A")} for ami in amis["Images"]]
+    # Load Balancers
+    lb_data = []
+    if elb_client:
+        try:
+            lbs = elb_client.describe_load_balancers()
+            for lb in lbs.get("LoadBalancers", []):
+                lb_data.append({
+                    "LB Name": lb.get("LoadBalancerName", "N/A"),
+                    "DNS Name": lb.get("DNSName", "N/A")
+                })
+        except Exception as e:
+            print(f"Error fetching Load Balancers: {e}")
+            traceback.print_exc()
+
+    # AMIs
+    ami_data = []
+    if ec2_client:
+        try:
+            amis = ec2_client.describe_images(Owners=["self"])
+            for ami in amis.get("Images", []):
+                ami_data.append({
+                    "AMI ID": ami.get("ImageId", "N/A"),
+                    "Name": ami.get("Name", "N/A")
+                })
+        except Exception as e:
+            print(f"Error fetching AMIs: {e}")
+            traceback.print_exc()
 
     html_template = \"\"\"
     <html>
@@ -309,6 +372,7 @@ def home():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)
+
 FLASKAPP
 
 # Set proper ownership
@@ -327,7 +391,7 @@ After=network.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/webapp
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
 ExecStart=/usr/bin/python3 /home/ubuntu/webapp/app.py
 Restart=always
 RestartSec=3
