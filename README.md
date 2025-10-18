@@ -25,9 +25,8 @@ JB_AWS_Project/
 │── universal_deployment.py   # Main Python deployment script
 │── README.md
 │── requirements.txt          # Python dependencies
-│── .gitignore
-└── images/
-   └── AWS_Reasources_Dashboard.jpg
+└── .gitignore
+
 
 ````
 
