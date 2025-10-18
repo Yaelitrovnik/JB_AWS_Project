@@ -225,6 +225,7 @@ chown ubuntu:ubuntu /home/ubuntu/webapp
 # Create Flask app with AWS resources display
 cat > /home/ubuntu/webapp/app.py << 'FLASKAPP'
 import os
+import requests
 import boto3
 from flask import Flask, render_template_string
 import traceback
