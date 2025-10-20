@@ -36,10 +36,12 @@ JB_AWS_Project/
 
 ### Python Dependencies
 
-- Python >= 3.9
+- Python
 - boto3
 - cryptography
+- requests
 - flask
+
 
 Install dependencies with:
 
