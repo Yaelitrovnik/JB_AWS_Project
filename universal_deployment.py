@@ -234,10 +234,20 @@ app = Flask(__name__)
 
 def get_self_instance_info():
     try:
+        token_url = "http://169.254.169.254/latest/api/token"
+        token = requests.put(
+            token_url,
+            headers={"X-aws-ec2-metadata-token-ttl-seconds": "21600"},
+            timeout=2
+        ).text
+
         base_url = "http://169.254.169.254/latest/meta-data"
-        instance_id = requests.get(f"{base_url}/instance-id", timeout=2).text
-        public_ip = requests.get(f"{base_url}/public-ipv4", timeout=2).text
-        instance_type = requests.get(f"{base_url}/instance-type", timeout=2).text
+        headers = {"X-aws-ec2-metadata-token": token}
+
+        instance_id = requests.get(f"{base_url}/instance-id", headers=headers, timeout=2).text
+        public_ip = requests.get(f"{base_url}/public-ipv4", headers=headers, timeout=2).text
+        instance_type = requests.get(f"{base_url}/instance-type", headers=headers, timeout=2).text
+
         return [{
             "ID": instance_id,
             "State": "running",
@@ -245,20 +255,8 @@ def get_self_instance_info():
             "Public IP": public_ip
         }]
     except Exception as e:
-        print(f"Error fetching instance metadata: {e}")
+        print(f"Metadata fetch failed: {e}")
         return []
-
-try:
-    ec2_client = boto3.client("ec2", region_name="us-east-2")
-except Exception as e:
-    print(f"Error creating EC2 client: {e}")
-    ec2_client = None
-
-try:
-    elb_client = boto3.client("elbv2", region_name="us-east-2")
-except Exception as e:
-    print(f"Error creating ELB client: {e}")
-    elb_client = None
 
 @app.route("/")
 def home():
