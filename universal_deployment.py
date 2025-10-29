@@ -234,7 +234,7 @@ systemctl start webapp.service
         ImageId=latest_ami,
         MinCount=1,
         MaxCount=1,
-        InstanceType='t3.micro',
+        InstanceType='t3.medium',
         KeyName=key_name,
         NetworkInterfaces=[{"DeviceIndex":0,"SubnetId":subnet_id,"AssociatePublicIpAddress":True,"Groups":[sg_id]}],
         TagSpecifications=[{'ResourceType':'instance','Tags':[{'Key':'Name','Value':'builder-yael'}]}],
