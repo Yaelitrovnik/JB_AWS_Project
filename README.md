@@ -164,9 +164,7 @@ http://<Public-IP>:5001
 It shows:
 
 * Running EC2 instances (ID, state, type, public IP)
-* VPCs (ID, CIDR)
-* Load Balancers (name, DNS)
-* Available AMIs (ID, name)
+* VPCs (ID)
 
 Health endpoint:
 
