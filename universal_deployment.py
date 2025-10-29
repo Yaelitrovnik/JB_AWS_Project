@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
 AWS Infrastructure + Web App Deployment Script
-Creates AWS EC2 instance and deploys a Flask web dashboard.
+Creates AWS EC2 instance and deploys a Flask web dashboard (systemd service).
 Works on Windows, Mac, and Linux - Ubuntu Version.
 """
 
 import boto3
 import os
 import sys
-import time
 import subprocess
 import platform
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -20,7 +19,6 @@ from botocore.exceptions import ClientError, NoCredentialsError
 # ------------------------------
 
 def detect_platform():
-    """Detect platform and SSH capability."""
     system = platform.system().lower()
     has_ssh = False
     try:
@@ -28,14 +26,9 @@ def detect_platform():
         has_ssh = True
     except (FileNotFoundError, subprocess.TimeoutExpired):
         has_ssh = False
-    return {
-        'system': system,
-        'is_windows': system == 'windows',
-        'has_ssh': has_ssh
-    }
+    return {'system': system, 'is_windows': system == 'windows', 'has_ssh': has_ssh}
 
 def generate_ssh_key():
-    """Generate SSH key pair."""
     print("🔑 Generating SSH key pair...")
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
     private_key_pem = private_key.private_bytes(
@@ -50,7 +43,6 @@ def generate_ssh_key():
     return {'private_key_pem': private_key_pem, 'public_key_openssh': public_key_openssh}
 
 def save_private_key_locally(private_key_pem, filename="builder_key.pem"):
-    """Save SSH private key."""
     print(f"💾 Saving private key to {filename}...")
     full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
     try:
@@ -64,7 +56,6 @@ def save_private_key_locally(private_key_pem, filename="builder_key.pem"):
         sys.exit(1)
 
 def create_aws_key_pair(key_name, public_key, region="us-east-2"):
-    """Create AWS key pair."""
     print(f"🔐 Creating AWS key pair '{key_name}'...")
     try:
         ec2 = boto3.client("ec2", region_name=region)
@@ -86,13 +77,11 @@ def create_aws_key_pair(key_name, public_key, region="us-east-2"):
         sys.exit(1)
 
 def get_user_ip():
-    """Get user's public IP address - defaults to open access."""
     print("🌍 Setting security access...")
     print("⚠️ Using 0.0.0.0/0 - accessible from anywhere for testing")
     return "0.0.0.0/0"
 
 def get_default_vpc(region="us-east-2"):
-    """Find default VPC."""
     print(f"🔍 Finding VPC in region {region}...")
     ec2 = boto3.client("ec2", region_name=region)
     vpcs = ec2.describe_vpcs(Filters=[{'Name': 'isDefault', 'Values': ['true']}])
@@ -108,7 +97,6 @@ def get_default_vpc(region="us-east-2"):
     raise Exception("No VPC found")
 
 def get_public_subnet_from_vpc(vpc_id, region="us-east-2"):
-    """Find a subnet in the VPC that auto-assigns public IPs (public subnet)."""
     print("🌐 Finding public subnet...")
     ec2 = boto3.client("ec2", region_name=region)
     response = ec2.describe_subnets(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}, {"Name": "state", "Values": ["available"]}])
@@ -123,7 +111,6 @@ def get_public_subnet_from_vpc(vpc_id, region="us-east-2"):
     return subnets[0]["SubnetId"]
 
 def ensure_internet_gateway(vpc_id, region="us-east-2"):
-    """Ensure IGW exists and is attached to VPC."""
     ec2 = boto3.client("ec2", region_name=region)
     igws = ec2.describe_internet_gateways(Filters=[{"Name": "attachment.vpc-id", "Values": [vpc_id]}])["InternetGateways"]
     if igws:
@@ -137,38 +124,18 @@ def ensure_internet_gateway(vpc_id, region="us-east-2"):
     return igw_id
 
 def ensure_public_route(subnet_id, igw_id, region="us-east-2"):
-    """Ensure the subnet route table has default route to IGW."""
     ec2 = boto3.client("ec2", region_name=region)
-
-    # Get route tables associated with the subnet
-    rts = ec2.describe_route_tables(
-        Filters=[{"Name": "association.subnet-id", "Values": [subnet_id]}]
-    )["RouteTables"]
-
+    rts = ec2.describe_route_tables(Filters=[{"Name": "association.subnet-id", "Values": [subnet_id]}])["RouteTables"]
     if not rts:
-        # If no explicit route table, get the main route table for the VPC
         subnet_info = ec2.describe_subnets(SubnetIds=[subnet_id])["Subnets"][0]
         vpc_id = subnet_info["VpcId"]
-        rts = ec2.describe_route_tables(
-            Filters=[{"Name": "vpc-id", "Values": [vpc_id]}]
-        )["RouteTables"]
-
-        # Find the main route table
-        main_rt = None
-        for rt in rts:
-            for assoc in rt.get("Associations", []):
-                if assoc.get("Main"):
-                    main_rt = rt
-                    break
-            if main_rt:
-                break
+        rts = ec2.describe_route_tables(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])["RouteTables"]
+        main_rt = next((rt for rt in rts if any(assoc.get("Main") for assoc in rt.get("Associations", []))), None)
         if not main_rt:
             raise Exception(f"No main route table found for VPC {vpc_id}")
         rt_id = main_rt["RouteTableId"]
     else:
         rt_id = rts[0]["RouteTableId"]
-
-    # Check if default route exists
     rt_info = ec2.describe_route_tables(RouteTableIds=[rt_id])["RouteTables"][0]
     if not any(r.get("DestinationCidrBlock") == "0.0.0.0/0" for r in rt_info.get("Routes", [])):
         ec2.create_route(RouteTableId=rt_id, DestinationCidrBlock="0.0.0.0/0", GatewayId=igw_id)
@@ -176,9 +143,7 @@ def ensure_public_route(subnet_id, igw_id, region="us-east-2"):
     else:
         print(f"✅ Default route already exists in route table {rt_id}")
 
-
 def create_security_group(vpc_id, user_ip, region="us-east-2"):
-    """Create security group."""
     print("🛡️ Creating security group...")
     ec2 = boto3.client("ec2", region_name=region)
     sg_name = "builder-yael-sg"
@@ -189,13 +154,10 @@ def create_security_group(vpc_id, user_ip, region="us-east-2"):
         return sg_id
     sg_create_response = ec2.create_security_group(GroupName=sg_name, Description="Security group for builder-yael instance", VpcId=vpc_id)
     sg_id = sg_create_response['GroupId']
-    ec2.authorize_security_group_ingress(
-        GroupId=sg_id,
-        IpPermissions=[
-            {'IpProtocol': 'tcp','FromPort': 22,'ToPort': 22,'IpRanges': [{'CidrIp': user_ip,'Description': 'SSH access'}]},
-            {'IpProtocol': 'tcp','FromPort': 5001,'ToPort': 5001,'IpRanges': [{'CidrIp': user_ip,'Description': 'Web app access'}]}
-        ]
-    )
+    ec2.authorize_security_group_ingress(GroupId=sg_id, IpPermissions=[
+        {'IpProtocol': 'tcp','FromPort': 22,'ToPort': 22,'IpRanges': [{'CidrIp': user_ip,'Description': 'SSH access'}]},
+        {'IpProtocol': 'tcp','FromPort': 5001,'ToPort': 5001,'IpRanges': [{'CidrIp': user_ip,'Description': 'Web app access'}]}
+    ])
     print(f"✅ Security group created: {sg_id}")
     return sg_id
 
@@ -204,184 +166,49 @@ def create_security_group(vpc_id, user_ip, region="us-east-2"):
 # ------------------------------
 
 def create_ec2_instance(key_name, vpc_id, subnet_id, sg_id, region="us-east-2"):
-    """Create EC2 instance with Ubuntu."""
     print("🚀 Creating EC2 instance...")
     ec2 = boto3.client("ec2", region_name=region)
-    # Get latest Ubuntu 22.04 LTS AMI
     response = ec2.describe_images(Filters=[{'Name': 'name','Values': ['ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*']},{'Name': 'owner-id','Values': ['099720109477']},{'Name': 'state','Values': ['available']}], Owners=['099720109477'])
     images = sorted(response['Images'], key=lambda x: x['CreationDate'], reverse=True)
     latest_ami = images[0]['ImageId']
     print(f"✅ Using Ubuntu 22.04 LTS AMI: {latest_ami}")
 
     user_data = """#!/bin/bash
-# Update system
 apt-get update -y
 apt-get install -y python3-pip python3-venv git
-
-# Create webapp directory
 mkdir -p /home/ubuntu/webapp
 chown ubuntu:ubuntu /home/ubuntu/webapp
 
-# Create Flask app with AWS resources display
-cat > /home/ubuntu/webapp/app.py << 'FLASKAPP'
+cat > /home/ubuntu/webapp/app.py << 'EOF'
 import os
 import requests
 import boto3
 from flask import Flask, render_template_string
-import traceback
-
 app = Flask(__name__)
 
-def get_self_instance_info():
-    try:
-        token_url = "http://169.254.169.254/latest/api/token"
-        token = requests.put(
-            token_url,
-            headers={"X-aws-ec2-metadata-token-ttl-seconds": "21600"},
-            timeout=2
-        ).text
-
-        base_url = "http://169.254.169.254/latest/meta-data"
-        headers = {"X-aws-ec2-metadata-token": token}
-
-        instance_id = requests.get(f"{base_url}/instance-id", headers=headers, timeout=2).text
-        public_ip = requests.get(f"{base_url}/public-ipv4", headers=headers, timeout=2).text
-        instance_type = requests.get(f"{base_url}/instance-type", headers=headers, timeout=2).text
-
-        return [{
-            "ID": instance_id,
-            "State": "running",
-            "Type": instance_type,
-            "Public IP": public_ip
-        }]
-    except Exception as e:
-        print(f"Metadata fetch failed: {e}")
-        return []
-
-@app.route("/")
+@app.route('/')
 def home():
-    instance_data = []
-    if ec2_client:
-        try:
-            instances = ec2_client.describe_instances()
-            for reservation in instances.get("Reservations", []):
-                for instance in reservation.get("Instances", []):
-                    instance_data.append({
-                        "ID": instance.get("InstanceId", "N/A"),
-                        "State": instance.get("State", {}).get("Name", "N/A"),
-                        "Type": instance.get("InstanceType", "N/A"),
-                        "Public IP": instance.get("PublicIpAddress", "N/A")
-                    })
-        except Exception as e:
-            print(f"Error fetching EC2 instances: {e}")
-            # fallback to self metadata
-            instance_data = get_self_instance_info()
-    else:
-        instance_data = get_self_instance_info()
+    try:
+        token = requests.put('http://169.254.169.254/latest/api/token', headers={'X-aws-ec2-metadata-token-ttl-seconds':'21600'}, timeout=2).text
+        headers = {'X-aws-ec2-metadata-token': token}
+        instance_id = requests.get('http://169.254.169.254/latest/meta-data/instance-id', headers=headers, timeout=2).text
+        public_ip = requests.get('http://169.254.169.254/latest/meta-data/public-ipv4', headers=headers, timeout=2).text
+        instance_type = requests.get('http://169.254.169.254/latest/meta-data/instance-type', headers=headers, timeout=2).text
 
+    except:
+        instance_id = 'N/A'
+        public_ip = 'N/A'
+        instance_type = 'N/A'
+    return f"<h2>EC2 is running!</h2><ul><li>ID: {instance_id}</li><li>Public IP: {public_ip}</li><li>Instance Type: {instance_type}</li></ul>"
 
-    # VPCs
-    vpc_data = []
-    if ec2_client:
-        try:
-            vpcs = ec2_client.describe_vpcs()
-            for vpc in vpcs.get("Vpcs", []):
-                vpc_data.append({
-                    "VPC ID": vpc.get("VpcId", "N/A"),
-                    "CIDR": vpc.get("CidrBlock", "N/A")
-                })
-        except Exception as e:
-            print(f"Error fetching VPCs: {e}")
-            traceback.print_exc()
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5001)
+EOF
 
-    # Load Balancers
-    lb_data = []
-    if elb_client:
-        try:
-            lbs = elb_client.describe_load_balancers()
-            for lb in lbs.get("LoadBalancers", []):
-                lb_data.append({
-                    "LB Name": lb.get("LoadBalancerName", "N/A"),
-                    "DNS Name": lb.get("DNSName", "N/A")
-                })
-        except Exception as e:
-            print(f"Error fetching Load Balancers: {e}")
-            traceback.print_exc()
-
-    # AMIs
-    ami_data = []
-    if ec2_client:
-        try:
-            amis = ec2_client.describe_images(Owners=["self"])
-            for ami in amis.get("Images", []):
-                ami_data.append({
-                    "AMI ID": ami.get("ImageId", "N/A"),
-                    "Name": ami.get("Name", "N/A")
-                })
-        except Exception as e:
-            print(f"Error fetching AMIs: {e}")
-            traceback.print_exc()
-
-    html_template = \"\"\"
-    <html>
-    <head><title>AWS Resources</title></head>
-    <body>
-        <h1>Running EC2 Instances</h1>
-        <table border='1'>
-            <tr><th>ID</th><th>State</th><th>Type</th><th>Public IP</th></tr>
-            {% for instance in instance_data %}
-            <tr><td>{{ instance['ID'] }}</td><td>{{ instance['State'] }}</td><td>{{ instance['Type'] }}</td><td>{{ instance['Public IP'] }}</td></tr>
-            {% endfor %}
-        </table>
-
-        <h1>VPCs</h1>
-        <table border='1'>
-            <tr><th>VPC ID</th><th>CIDR</th></tr>
-            {% for vpc in vpc_data %}
-            <tr><td>{{ vpc['VPC ID'] }}</td><td>{{ vpc['CIDR'] }}</td></tr>
-            {% endfor %}
-        </table>
-
-        <h1>Load Balancers</h1>
-        <table border='1'>
-            <tr><th>LB Name</th><th>DNS Name</th></tr>
-            {% for lb in lb_data %}
-            <tr><td>{{ lb['LB Name'] }}</td><td>{{ lb['DNS Name'] }}</td></tr>
-            {% endfor %}
-        </table>
-
-        <h1>Available AMIs</h1>
-        <table border='1'>
-            <tr><th>AMI ID</th><th>Name</th></tr>
-            {% for ami in ami_data %}
-            <tr><td>{{ ami['AMI ID'] }}</td><td>{{ ami['Name'] }}</td></tr>
-            {% endfor %}
-        </table>
-    </body>
-    </html>
-    \"\"\"
-
-    return render_template_string(
-        html_template,
-        instance_data=instance_data,
-        vpc_data=vpc_data,
-        lb_data=lb_data,
-        ami_data=ami_data
-    )
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001)
-
-FLASKAPP
-
-# Set proper ownership
 chown ubuntu:ubuntu /home/ubuntu/webapp/app.py
+pip3 install flask boto3 requests
 
-# Install Flask
-pip3 install flask boto3
-
-# Create systemd service
-cat > /etc/systemd/system/webapp.service << 'EOF'
+cat > /etc/systemd/system/webapp.service << 'SERVICE'
 [Unit]
 Description=Flask Web Application
 After=network.target
@@ -390,25 +217,24 @@ After=network.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/webapp
-Environment="PATH=/usr/local/bin:/usr/bin:/bin"
 ExecStart=/usr/bin/python3 /home/ubuntu/webapp/app.py
 Restart=always
 RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
-EOF
+SERVICE
 
-# Enable and start the service
 systemctl daemon-reload
 systemctl enable webapp.service
 systemctl start webapp.service
 """
+
     response = ec2.run_instances(
         ImageId=latest_ami,
         MinCount=1,
         MaxCount=1,
-        InstanceType='t3.medium',
+        InstanceType='t3.micro',
         KeyName=key_name,
         NetworkInterfaces=[{"DeviceIndex":0,"SubnetId":subnet_id,"AssociatePublicIpAddress":True,"Groups":[sg_id]}],
         TagSpecifications=[{'ResourceType':'instance','Tags':[{'Key':'Name','Value':'builder-yael'}]}],
@@ -421,11 +247,7 @@ systemctl start webapp.service
     waiter.wait(InstanceIds=[instance_id], WaiterConfig={'Delay':15,'MaxAttempts':40})
     instance_info = ec2.describe_instances(InstanceIds=[instance_id])
     instance = instance_info['Reservations'][0]['Instances'][0]
-    return {
-        'instance_id': instance_id,
-        'public_ip': instance.get('PublicIpAddress'),
-        'region': region
-    }
+    return {'instance_id': instance_id, 'public_ip': instance.get('PublicIpAddress'), 'region': region}
 
 # ------------------------------
 # Main
@@ -436,36 +258,25 @@ def main():
     platform_info = detect_platform()
     print(f"🖥️ Platform: {platform_info['system'].title()}")
     print(f"🔧 SSH Available: {'✅' if platform_info['has_ssh'] else '❌'}")
-    print("🐧 Using Ubuntu 22.04 LTS AMI\n")
 
     try:
-        print("🔑 Step 1: Generate SSH Key")
         ssh_key = generate_ssh_key()
         private_key_file = save_private_key_locally(ssh_key['private_key_pem'])
-
-        print("\n🔐 Step 2: Create AWS Key Pair")
         create_aws_key_pair("builder-key", ssh_key['public_key_openssh'])
-
-        print("\n🌍 Step 3: Configure Security")
         user_ip = get_user_ip()
-
-        print("\n🏗️ Step 4: Create Infrastructure")
         vpc_id = get_default_vpc()
         subnet_id = get_public_subnet_from_vpc(vpc_id)
         igw_id = ensure_internet_gateway(vpc_id)
         ensure_public_route(subnet_id, igw_id)
         sg_id = create_security_group(vpc_id, user_ip)
-
-        print("\n🚀 Step 5: Create Ubuntu EC2 Instance")
         ec2_instance = create_ec2_instance("builder-key", vpc_id, subnet_id, sg_id)
-
         print("\n🎉 DEPLOYMENT COMPLETED!")
         print(f"🏷️ Instance Name: builder-yael")
         print(f"🆔 Instance ID: {ec2_instance['instance_id']}")
         print(f"🌐 Public IP: {ec2_instance['public_ip']}")
         print(f"🔗 Access: ssh -i \"{private_key_file['filename']}\" ubuntu@{ec2_instance['public_ip']}")
         print(f"💻 Web Dashboard: http://{ec2_instance['public_ip']}:5001")
-        
+
     except Exception as e:
         print(f"❌ Error: {e}")
         sys.exit(1)
